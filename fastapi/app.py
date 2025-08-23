@@ -1,15 +1,17 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI,Header, HTTPException
 from pydantic import BaseModel
 from crewai import Agent, Task, Crew
 from langchain_openai import ChatOpenAI
-
+from dotenv import load_dotenv
+load_dotenv()  # wczytuje .env
 # === Konfiguracja LLM przez OpenRouter ===
 llm = ChatOpenAI(
     model="openrouter/moonshotai/kimi-k2:free",
     api_key=os.getenv("OPENROUTER_API_KEY"),  # korzysta z Hugging Face Secret
     base_url="https://openrouter.ai/api/v1"
 )
+API_TOKEN = os.getenv("API_TOKEN")
 
 app = FastAPI(title="CrewAI + OpenRouter Example")
 
@@ -78,8 +80,12 @@ class Event(BaseModel):
     gyro: Gyro
 
 # --- Endpoint ---
+
 @app.post("/process")
-def process_event(event: Event):
+def process_event(event: Event, authorization: str = Header(None)):
+    if authorization != f"Bearer {API_TOKEN}":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
     result = crew.kickoff(inputs=event.dict())
     return {"result": result}
 
