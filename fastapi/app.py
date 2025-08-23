@@ -1,19 +1,31 @@
 import os
-from fastapi import FastAPI,Header, HTTPException
+from fastapi import FastAPI, Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from crewai import Agent, Task, Crew
 from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
-load_dotenv()  # wczytuje .env
+
+# --- Wczytaj zmienne z .env ---
+load_dotenv()
+API_TOKEN = os.getenv("API_TOKEN")
+
 # === Konfiguracja LLM przez OpenRouter ===
 llm = ChatOpenAI(
     model="openrouter/moonshotai/kimi-k2:free",
-    api_key=os.getenv("OPENROUTER_API_KEY"),  # korzysta z Hugging Face Secret
+    api_key=os.getenv("OPENROUTER_API_KEY"),  # klucz z .env
     base_url="https://openrouter.ai/api/v1"
 )
-API_TOKEN = os.getenv("API_TOKEN")
 
 app = FastAPI(title="CrewAI + OpenRouter Example")
+
+# --- Security (Bearer Token) ---
+security = HTTPBearer()
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    if credentials.scheme != "Bearer" or credentials.credentials != API_TOKEN:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return credentials
 
 # --- Definicja agentów ---
 guardian = Agent(
@@ -38,7 +50,6 @@ communicator = Agent(
 )
 
 # --- Definicja zadań ---
-
 guardian_task = Task(
     description=(
         "Na podstawie danych sensorów PIR={pir}, distance={distance}, "
@@ -61,7 +72,6 @@ communicator_task = Task(
     agent=communicator
 )
 
-
 crew = Crew(
     agents=[guardian, analyst, communicator],
     tasks=[guardian_task, analyst_task, communicator_task]
@@ -80,12 +90,8 @@ class Event(BaseModel):
     gyro: Gyro
 
 # --- Endpoint ---
-
 @app.post("/process")
-def process_event(event: Event, authorization: str = Header(None)):
-    if authorization != f"Bearer {API_TOKEN}":
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    
+def process_event(event: Event, credentials: HTTPAuthorizationCredentials = Depends(verify_token)):
     result = crew.kickoff(inputs=event.dict())
     return {"result": result}
 
