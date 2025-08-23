@@ -4,3 +4,4 @@ pydantic
 crewai
 langchain
 openai
+langchain_openai
