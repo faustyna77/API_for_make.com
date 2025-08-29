@@ -23,7 +23,7 @@ const int echoPin = 14;
 MPU6050 mpu;
 
 // ===== Webhook n8n =====
-const char* serverName = "https://hook.eu2.make.com/chr3xx6zgu2y5sx3j6awo964xfddr7v2";
+
 
 // ===== NTP =====
 WiFiUDP ntpUDP;
